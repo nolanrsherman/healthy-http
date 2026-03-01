@@ -32,7 +32,8 @@ docker:
 #   make publish                           # amd64 only (default)
 #   make publish PLATFORMS="linux/amd64,linux/arm64"
 #   make publish PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
-PLATFORMS ?= linux/amd64,linux/arm64
+# Cloud Run requires linux/amd64. Use linux/amd64 only for Cloud Run compatibility, or add linux/arm64 for multi-arch.
+PLATFORMS ?= linux/amd64
 
 .PHONY: publish
 publish:
