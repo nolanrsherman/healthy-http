@@ -27,10 +27,15 @@ docker:
 	@./scripts/incr-version $(VERSION_BUMP)
 	@IMG=$(if $(DOCKERHUB_USER),$(DOCKERHUB_USER)/healthy-http,healthy-http); docker build -t $$IMG:$(shell cat version.txt) -t $$IMG:latest .
 
+# Platform(s) to build for. Use comma-separated list for multi-arch.
+# Examples:
+#   make publish                           # amd64 only (default)
+#   make publish PLATFORMS="linux/amd64,linux/arm64"
+#   make publish PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
+PLATFORMS ?= linux/amd64,linux/arm64
+
 .PHONY: publish
 publish:
 	@test -n "$(DOCKERHUB_USER)" || (echo "Error: DOCKERHUB_USER is required. Usage: make DOCKERHUB_USER=youruser publish"; exit 1)
 	@docker manifest inspect $(IMAGE):$(VERSION) >/dev/null 2>&1 && (echo "Error: $(VERSION) is already published to Docker Hub"; exit 1) || true
-	@docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
-	@docker push $(IMAGE):$(VERSION)
-	@docker push $(IMAGE):latest
+	@docker buildx build --platform $(PLATFORMS) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
