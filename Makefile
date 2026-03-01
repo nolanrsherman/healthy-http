@@ -27,16 +27,20 @@ docker:
 	@./scripts/incr-version $(VERSION_BUMP)
 	@IMG=$(if $(DOCKERHUB_USER),$(DOCKERHUB_USER)/healthy-http,healthy-http); docker build -t $$IMG:$(shell cat version.txt) -t $$IMG:latest .
 
-# Platform(s) to build for. Use comma-separated list for multi-arch.
-# Examples:
-#   make publish                           # amd64 only (default)
-#   make publish PLATFORMS="linux/amd64,linux/arm64"
-#   make publish PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
-# Cloud Run requires linux/amd64. Use linux/amd64 only for Cloud Run compatibility, or add linux/arm64 for multi-arch.
-PLATFORMS ?= linux/amd64
-
+# publish uses docker build (single-platform) for Cloud Run compatibility. Cloud Run rejects
+# OCI manifest lists; it requires a single-image manifest for amd64/linux.
 .PHONY: publish
 publish:
 	@test -n "$(DOCKERHUB_USER)" || (echo "Error: DOCKERHUB_USER is required. Usage: make DOCKERHUB_USER=youruser publish"; exit 1)
 	@docker manifest inspect $(IMAGE):$(VERSION) >/dev/null 2>&1 && (echo "Error: $(VERSION) is already published to Docker Hub"; exit 1) || true
-	@docker buildx build --platform $(PLATFORMS) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
+	@docker build --platform linux/amd64 -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
+	@docker push $(IMAGE):$(VERSION)
+	@docker push $(IMAGE):latest
+
+# Multi-arch publish (buildx). Note: Cloud Run does not support OCI manifest lists; use publish for Cloud Run.
+# PLATFORMS ?= linux/amd64,linux/arm64
+.PHONY: publish-multiarch
+publish-multiarch:
+	@test -n "$(DOCKERHUB_USER)" || (echo "Error: DOCKERHUB_USER is required"; exit 1)
+	@docker manifest inspect $(IMAGE):$(VERSION) >/dev/null 2>&1 && (echo "Error: $(VERSION) is already published"; exit 1) || true
+	@docker buildx build --platform $(or $(PLATFORMS),linux/amd64,linux/arm64) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest --push .
